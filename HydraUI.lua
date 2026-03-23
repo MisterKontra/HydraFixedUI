@@ -3343,7 +3343,7 @@ function UILibrary.new(gameName, userId, rank)
             if padding then
                 -- Give enough room for avatar + text (id/nickname lines).
                 -- Avatar is 56px wide with a small left offset; 90px keeps text inside bounds.
-                padding.PaddingLeft = UDim.new(0, 100)
+                padding.PaddingLeft = UDim.new(0, 72)
             end
         end
     end
@@ -3351,6 +3351,13 @@ function UILibrary.new(gameName, userId, rank)
     local userinfo = window.MainUI.Sidebar.ContentHolder.UserInfo.Content
     userinfo.Rank.Text = rankText
     userinfo.Title.Text = nicknameText
+
+    -- Prevent long nicknames from spilling outside the block.
+    userinfo.Title.TextScaled = true
+    userinfo.Title.TextWrapped = false
+    pcall(function()
+        userinfo.Title.TextTruncate = Enum.TextTruncate.AtEnd
+    end)
 
     -- Toggle hide/show UI on RightShift press (no hold)
     do
