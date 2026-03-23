@@ -3343,7 +3343,7 @@ function UILibrary.new(gameName, userId, rank)
             if padding then
                 -- Give enough room for avatar + text (id/nickname lines).
                 -- Avatar is 56px wide with a small left offset; 90px keeps text inside bounds.
-                padding.PaddingLeft = UDim.new(0, 80)
+                padding.PaddingLeft = UDim.new(0, 100)
             end
         end
     end
