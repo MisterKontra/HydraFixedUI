@@ -3284,7 +3284,7 @@ function UILibrary.new(gameName, userId, rank)
     Frame.Position = UDim2.fromScale(.5, .5)
 
     local AspectRatio = Instance.new("UIAspectRatioConstraint", Frame)
-    AspectRatio.AspectRatio = 1.2
+    AspectRatio.AspectRatio = 1.4
 
     Frame.Parent = window.MainUI.Sidebar.ContentHolder.Cheats.Logo
     Frame.ZIndex = 300
