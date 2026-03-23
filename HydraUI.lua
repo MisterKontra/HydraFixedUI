@@ -2513,6 +2513,12 @@ if not UIObjects then
     error("getObjects() returned nil (UIObjects not created)")
 end
 
+    -- Save template references immediately.
+    -- In some contexts `script.Objects/script.Cheats` can be missing, but the
+    -- template instances still exist, so we clone from these references.
+    local CheatsFolder = UIObjects:FindFirstChild("Cheats")
+    local ObjectsFolder = UIObjects:FindFirstChild("Objects")
+
 UIObjects.Parent = script
 
 for _, v in ipairs(UIObjects:GetChildren()) do
@@ -2523,17 +2529,17 @@ UIObjects:Destroy()
 
     function objGen.new(objectType, cheatName)
         if objectType == "Cheat" then
-            if script.Cheats:FindFirstChild(cheatName) then
-                return script.Cheats[cheatName]:Clone()
+            if CheatsFolder and CheatsFolder:FindFirstChild(cheatName) then
+                return CheatsFolder[cheatName]:Clone()
             else
-                error("Invalid cheatType")
+                error(("Invalid cheatType: %s"):format(tostring(cheatName)))
             end
         end
 
-        if script.Objects:FindFirstChild(objectType) then
-            return script.Objects[objectType]:Clone()
+        if ObjectsFolder and ObjectsFolder:FindFirstChild(objectType) then
+            return ObjectsFolder[objectType]:Clone()
         else
-            error("Invalid objectType")
+            error(("Invalid objectType: %s"):format(tostring(objectType)))
         end
     end
 
