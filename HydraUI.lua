@@ -1209,7 +1209,7 @@ local function getObjGen()
             Gui.Watermark.BackgroundTransparency = 1.000
             Gui.Watermark.Size = UDim2.new(0.5, 0, 0.0199999996, 0)
             Gui.Watermark.Font = Enum.Font.Gotham
-            Gui.Watermark.Text = "hydrahub v2 | nil | nil"
+            Gui.Watermark.Text = "hydrahub v2 | ? | ?"
             Gui.Watermark.TextColor3 = Color3.fromRGB(255, 255, 255)
             Gui.Watermark.TextSize = 14.000
             Gui.Watermark.TextStrokeTransparency = 0.800
@@ -3256,6 +3256,23 @@ function UILibrary.new(gameName, userId, rank)
     local window = objectGenerator.new("Window")
     window.Parent = GUI
 
+    local function safeText(value, fallback)
+        if value == nil then
+            return fallback or ""
+        end
+
+        local t = type(value)
+        if t == "boolean" then
+            return fallback or ""
+        end
+
+        if t == "string" or t == "number" then
+            return tostring(value)
+        end
+
+        return fallback or ""
+    end
+
     --// make UI draggable
     -->> LogoHitbox
 
@@ -3275,10 +3292,69 @@ function UILibrary.new(gameName, userId, rank)
     local Drag = Draggable.Drag(window.MainUI, Frame)
 
     --// Customize the GUI
-    window.Watermark.Text = ("hydrahub v2 | %s | %s"):format(userId, gameName)
+    local userText = safeText(userId, LocalPlayer and LocalPlayer.Name or "Player")
+    local rankText = safeText(rank, "User")
+    local gameText = safeText(gameName, tostring(game.PlaceId))
+
+    window.Watermark.Text = ("hydrahub v2 | %s | %s"):format(userText, gameText)
+
+    -- Avatar icon + shift text to the right (so it doesn't overlap the icon)
+    do
+        local userInfo = window.MainUI.Sidebar.ContentHolder.UserInfo
+        local avatar = userInfo and userInfo:FindFirstChild("Texture")
+        local content = userInfo and userInfo:FindFirstChild("Content")
+
+        if avatar and avatar:IsA("ImageLabel") then
+            avatar.Size = UDim2.fromOffset(22, 22)
+            avatar.Position = UDim2.new(0, 10, 0.5, -11)
+
+            local ok, url = pcall(function()
+                return Players:GetUserThumbnailAsync(
+                    LocalPlayer.UserId,
+                    Enum.ThumbnailType.HeadShot,
+                    Enum.ThumbnailSize.Size180x180
+                )
+            end)
+
+            if ok and url then
+                avatar.Image = url
+            end
+        end
+
+        if content then
+            local padding = content:FindFirstChild("UIPadding_7") or content:FindFirstChildWhichIsA("UIPadding")
+            if padding then
+                padding.PaddingLeft = UDim.new(0, 34)
+            end
+        end
+    end
+
     local userinfo = window.MainUI.Sidebar.ContentHolder.UserInfo.Content
-    userinfo.Rank.Text = rank
-    userinfo.Title.Text = userId
+    userinfo.Rank.Text = rankText
+    userinfo.Title.Text = userText
+
+    -- Hide/show UI while holding RightShift
+    do
+        local UIS = game:GetService("UserInputService")
+        local mainUI = window.MainUI
+        UIS.InputBegan:Connect(function(input, gp)
+            if gp then
+                return
+            end
+            if input.KeyCode == Enum.KeyCode.RightShift then
+                mainUI.Visible = false
+            end
+        end)
+
+        UIS.InputEnded:Connect(function(input, gp)
+            if gp then
+                return
+            end
+            if input.KeyCode == Enum.KeyCode.RightShift then
+                mainUI.Visible = true
+            end
+        end)
+    end
 
     return setmetatable(
         {
