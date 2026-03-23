@@ -3292,11 +3292,13 @@ function UILibrary.new(gameName, userId, rank)
     local Drag = Draggable.Drag(window.MainUI, Frame)
 
     --// Customize the GUI
-    local userText = safeText(userId, LocalPlayer and LocalPlayer.Name or "Player")
+    local idText = safeText(userId, LocalPlayer and tostring(LocalPlayer.UserId) or "")
+    local nicknameText = safeText(LocalPlayer and LocalPlayer.Name or nil, "Player")
     local rankText = safeText(rank, "User")
     local gameText = safeText(gameName, tostring(game.PlaceId))
 
-    window.Watermark.Text = ("hydrahub v2 | %s | %s"):format(userText, gameText)
+    -- Watermark: nickname + id (so user won't lose the id after swapping Title to nickname)
+    window.Watermark.Text = ("hydrahub v2 | %s | %s"):format(nicknameText, idText)
 
     -- Avatar icon + shift text to the right (so it doesn't overlap the icon)
     do
@@ -3340,14 +3342,15 @@ function UILibrary.new(gameName, userId, rank)
             local padding = content:FindFirstChild("UIPadding_7") or content:FindFirstChildWhichIsA("UIPadding")
             if padding then
                 -- Give enough room for avatar + text (id/nickname lines).
-                padding.PaddingLeft = UDim.new(0, 145)
+                -- Avatar is 56px wide with a small left offset; 90px keeps text inside bounds.
+                padding.PaddingLeft = UDim.new(0, 90)
             end
         end
     end
 
     local userinfo = window.MainUI.Sidebar.ContentHolder.UserInfo.Content
     userinfo.Rank.Text = rankText
-    userinfo.Title.Text = userText
+    userinfo.Title.Text = nicknameText
 
     -- Toggle hide/show UI on RightShift press (no hold)
     do
