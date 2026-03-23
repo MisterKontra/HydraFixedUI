@@ -1208,8 +1208,9 @@ local function getObjGen()
             Gui.Watermark.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             Gui.Watermark.BackgroundTransparency = 1.000
             Gui.Watermark.Size = UDim2.new(0.5, 0, 0.0199999996, 0)
+            Gui.Watermark.Visible = false
             Gui.Watermark.Font = Enum.Font.Gotham
-            Gui.Watermark.Text = "hydrahub v2 | ? | ?"
+            Gui.Watermark.Text = "hydrahub v2"
             Gui.Watermark.TextColor3 = Color3.fromRGB(255, 255, 255)
             Gui.Watermark.TextSize = 14.000
             Gui.Watermark.TextStrokeTransparency = 0.800
@@ -3297,14 +3298,18 @@ function UILibrary.new(gameName, userId, rank)
     local rankText = safeText(rank, "User")
     local gameText = safeText(gameName, tostring(game.PlaceId))
 
-    -- Watermark: nickname + id (so user won't lose the id after swapping Title to nickname)
-    window.Watermark.Text = ("hydrahub v2 | %s | %s"):format(nicknameText, idText)
+    -- Watermark disabled
+    if window.Watermark then
+        window.Watermark.Visible = false
+        window.Watermark.Text = ""
+    end
 
     -- Avatar icon + shift text to the right (so it doesn't overlap the icon)
     do
         local userInfo = window.MainUI.Sidebar.ContentHolder.UserInfo
         local avatar = userInfo and userInfo:FindFirstChild("Texture")
         local content = userInfo and userInfo:FindFirstChild("Content")
+        local textPaddingLeft = 72 -- keep nickname/id inside bounds
 
         if avatar and avatar:IsA("ImageLabel") then
             avatar.Visible = true
@@ -3315,6 +3320,28 @@ function UILibrary.new(gameName, userId, rank)
             avatar.ImageTransparency = 0
             avatar.BackgroundTransparency = 1
             avatar.ScaleType = Enum.ScaleType.Crop
+
+            -- Square background behind the avatar (visual "квадрат")
+            local square = userInfo:FindFirstChild("AvatarSquare")
+            if not square then
+                square = Instance.new("Frame")
+                square.Name = "AvatarSquare"
+                square.Parent = userInfo
+                square.BorderSizePixel = 0
+
+                local corner = Instance.new("UICorner")
+                corner.Name = "AvatarSquareCorner"
+                corner.CornerRadius = UDim.new(0, 0)
+                corner.Parent = square
+            end
+
+            square.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+            square.BackgroundTransparency = 0.35
+            square.Size = avatar.Size
+            square.AnchorPoint = avatar.AnchorPoint
+            square.Position = avatar.Position
+            square.ZIndex = avatar.ZIndex - 1
+            square.Visible = true
 
             local corner = avatar:FindFirstChildOfClass("UICorner")
             if not corner then
@@ -3343,7 +3370,19 @@ function UILibrary.new(gameName, userId, rank)
             if padding then
                 -- Give enough room for avatar + text (id/nickname lines).
                 -- Avatar is 56px wide with a small left offset; 90px keeps text inside bounds.
-                padding.PaddingLeft = UDim.new(0, 72)
+                padding.PaddingLeft = UDim.new(0, textPaddingLeft)
+            end
+        end
+
+        -- UIPadding shifts children but does NOT reduce their width, so we
+        -- shrink Rank/Title width by the same amount to prevent spillover.
+        local userinfo = window.MainUI.Sidebar.ContentHolder.UserInfo.Content
+        if userinfo then
+            if userinfo:FindFirstChild("Rank") then
+                userinfo.Rank.Size = UDim2.new(1, -textPaddingLeft, 0.5, 0)
+            end
+            if userinfo:FindFirstChild("Title") then
+                userinfo.Title.Size = UDim2.new(1, -textPaddingLeft, 0.5, 0)
             end
         end
     end
@@ -4565,6 +4604,13 @@ function UILibrary.Section:Keybind(sett, callback)
     local keyPressConn = nil
 
     functions.setValue = function(new)
+        if new == nil then
+            element.Text.Text = "None"
+            updateSize()
+            currentKb = nil
+            return
+        end
+
         --/// anims
         element.Text.Text = new.Name
         updateSize()
@@ -4584,6 +4630,10 @@ function UILibrary.Section:Keybind(sett, callback)
                     return
                 end
 
+                if currentKb == nil then
+                    return
+                end
+
                 if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == currentKb then
                     callback()
                 elseif input.UserInputType.Name == currentKb.Name then
@@ -4594,7 +4644,8 @@ function UILibrary.Section:Keybind(sett, callback)
     end
 
     functions.getValue = function()
-        return currentKb
+        -- Never return nil to avoid "nil" spam in scripts that print getValue()
+        return currentKb or ""
     end
 
     updateSize()
