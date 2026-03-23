@@ -2532,14 +2532,14 @@ UIObjects:Destroy()
             if CheatsFolder and CheatsFolder:FindFirstChild(cheatName) then
                 return CheatsFolder[cheatName]:Clone()
             else
-                error(("Invalid cheatType: %s"):format(tostring(cheatName)))
+                error("Invalid cheatType")
             end
         end
 
         if ObjectsFolder and ObjectsFolder:FindFirstChild(objectType) then
             return ObjectsFolder[objectType]:Clone()
         else
-            error(("Invalid objectType: %s"):format(tostring(objectType)))
+            error("Invalid objectType")
         end
     end
 
@@ -3305,8 +3305,19 @@ function UILibrary.new(gameName, userId, rank)
         local content = userInfo and userInfo:FindFirstChild("Content")
 
         if avatar and avatar:IsA("ImageLabel") then
-            avatar.Size = UDim2.fromOffset(22, 22)
-            avatar.Position = UDim2.new(0, 10, 0.5, -11)
+            avatar.Size = UDim2.fromOffset(20, 20)
+            avatar.AnchorPoint = Vector2.new(0, 0.5)
+            avatar.Position = UDim2.new(0, 12, 0.5, 0)
+            avatar.ZIndex = 124
+            avatar.ImageTransparency = 0
+            avatar.ScaleType = Enum.ScaleType.Crop
+
+            local corner = avatar:FindFirstChildOfClass("UICorner")
+            if not corner then
+                corner = Instance.new("UICorner")
+                corner.Parent = avatar
+            end
+            corner.CornerRadius = UDim.new(1, 0)
 
             local ok, url = pcall(function()
                 return Players:GetUserThumbnailAsync(
@@ -3319,12 +3330,14 @@ function UILibrary.new(gameName, userId, rank)
             if ok and url then
                 avatar.Image = url
             end
+
+            avatar.Visible = true
         end
 
         if content then
             local padding = content:FindFirstChild("UIPadding_7") or content:FindFirstChildWhichIsA("UIPadding")
             if padding then
-                padding.PaddingLeft = UDim.new(0, 34)
+                padding.PaddingLeft = UDim.new(0, 40)
             end
         end
     end
@@ -3333,25 +3346,19 @@ function UILibrary.new(gameName, userId, rank)
     userinfo.Rank.Text = rankText
     userinfo.Title.Text = userText
 
-    -- Hide/show UI while holding RightShift
+    -- Toggle hide/show UI on RightShift press (no hold)
     do
         local UIS = game:GetService("UserInputService")
         local mainUI = window.MainUI
+        local hidden = not mainUI.Visible
+
         UIS.InputBegan:Connect(function(input, gp)
             if gp then
                 return
             end
             if input.KeyCode == Enum.KeyCode.RightShift then
-                mainUI.Visible = false
-            end
-        end)
-
-        UIS.InputEnded:Connect(function(input, gp)
-            if gp then
-                return
-            end
-            if input.KeyCode == Enum.KeyCode.RightShift then
-                mainUI.Visible = true
+                hidden = not hidden
+                mainUI.Visible = not hidden
             end
         end)
     end
