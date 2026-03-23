@@ -3305,11 +3305,13 @@ function UILibrary.new(gameName, userId, rank)
         local content = userInfo and userInfo:FindFirstChild("Content")
 
         if avatar and avatar:IsA("ImageLabel") then
-            avatar.Size = UDim2.fromOffset(26, 26)
+            avatar.Visible = true
+            avatar.Size = UDim2.fromOffset(56, 56)
             avatar.AnchorPoint = Vector2.new(0, 0.5)
-            avatar.Position = UDim2.new(0, 8, 0.5, 0)
-            avatar.ZIndex = 124
+            avatar.Position = UDim2.new(0, 4, 0.5, 0)
+            avatar.ZIndex = 200
             avatar.ImageTransparency = 0
+            avatar.BackgroundTransparency = 1
             avatar.ScaleType = Enum.ScaleType.Crop
 
             local corner = avatar:FindFirstChildOfClass("UICorner")
@@ -3338,7 +3340,7 @@ function UILibrary.new(gameName, userId, rank)
             local padding = content:FindFirstChild("UIPadding_7") or content:FindFirstChildWhichIsA("UIPadding")
             if padding then
                 -- Give enough room for avatar + text (id/nickname lines).
-                padding.PaddingLeft = UDim.new(0, 54)
+                padding.PaddingLeft = UDim.new(0, 160)
             end
         end
     end
