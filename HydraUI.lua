@@ -3284,7 +3284,7 @@ function UILibrary.new(gameName, userId, rank)
     Frame.Position = UDim2.fromScale(.5, .5)
 
     local AspectRatio = Instance.new("UIAspectRatioConstraint", Frame)
-    AspectRatio.AspectRatio = 1.4
+    AspectRatio.AspectRatio = 1.2
 
     Frame.Parent = window.MainUI.Sidebar.ContentHolder.Cheats.Logo
     Frame.ZIndex = 300
@@ -3340,7 +3340,7 @@ function UILibrary.new(gameName, userId, rank)
             local padding = content:FindFirstChild("UIPadding_7") or content:FindFirstChildWhichIsA("UIPadding")
             if padding then
                 -- Give enough room for avatar + text (id/nickname lines).
-                padding.PaddingLeft = UDim.new(0, 160)
+                padding.PaddingLeft = UDim.new(0, 145)
             end
         end
     end
