@@ -2877,30 +2877,21 @@ function UILibrary.new(gameName, userId, rank)
     }, UILibrary.Window)
 end
 
--- [ ЛОГИКА ПЕРЕКЛЮЧЕНИЯ СТРАНИЦ ]
-
--- Функция для смены основных разделов (самый левый бар)
+-- переключение логика
 function UILibrary.Window:ChangeCategory(name)
-    local sidebar2 = self.MainUI:FindFirstChild("MainUI").Sidebar.Sidebar2
-    
-    -- Проходим по всем контейнерам во втором сайдбаре
-    for _, child in pairs(sidebar2:GetChildren()) do
+    -- Показываем нужный набор кнопок в Sidebar2
+    for _, child in pairs(self.MainUI:FindFirstChild("MainUI").Sidebar.Sidebar2:GetChildren()) do
         if child:IsA("Frame") or child:IsA("CanvasGroup") then 
-            -- Если имя совпадает с выбранной категорией — показываем, остальное прячем
             child.Visible = (child.Name == name) 
         end
     end
     self.currentSelection = name
 end
 
--- Функция для смены вкладок внутри одной категории (верхние кнопки)
 function UILibrary.Window:ChangeCategorySelection(name)
-    local contentFrame = self.MainUI:FindFirstChild("MainUI").Content
-    
-    -- Проходим по всем страницам со списками читов
-    for _, child in pairs(contentFrame:GetChildren()) do
+    -- Показываем нужную страницу с читами в основном окне
+    for _, child in pairs(self.MainUI:FindFirstChild("MainUI").Content:GetChildren()) do
         if child:IsA("ScrollingFrame") then 
-            -- Показываем только выбранную страницу
             child.Visible = (child.Name == name) 
         end
     end
@@ -2910,15 +2901,13 @@ end
 
 function UILibrary.Window:Category(name, icon)
     local mainUI = self.MainUI:FindFirstChild("MainUI")
-    local catFolder = mainUI.Sidebar.ContentHolder.Cheats.CheatHolder
     local category = objectGenerator.new("Category")
 
     category.Content.Title.Text = SafeText(name)
     category.Content.Image.Image = icon or ""
-    category.Name = RName()
-    category.Parent = catFolder
+    category.Parent = mainUI.Sidebar.ContentHolder.Cheats.CheatHolder
 
-    -- Создаем холдер для кнопок во втором сайдбаре
+    -- Создаем контейнер для кнопок в Sidebar2
     local contentHolder = objectGenerator.new("CategoryContent")
     contentHolder.Name = name
     contentHolder.Parent = mainUI.Sidebar.Sidebar2
@@ -2944,12 +2933,11 @@ end
 
 function UILibrary.Category:Button(name, icon)
     local button = objectGenerator.new("CategoryButton")
-    button.InnerContent.Image_2.Image = icon or ""
     button.InnerContent.Title_3.Text = SafeText(name)
-    button.Name = RName()
+    button.InnerContent.Image_2.Image = icon or ""
     button.Parent = self.contentHolder.Bar2Holder
 
-    -- Создаем основной фрейм для читов
+    -- Создаем фрейм, где будут лежать секции
     local CategoryFrame = objectGenerator.new("CategoryFrame")
     CategoryFrame.Name = name
     CategoryFrame.Parent = self.oldSelf.MainUI:FindFirstChild("MainUI").Content
@@ -2977,7 +2965,6 @@ function UILibrary.Button:Section(name, side)
     
     local Section = objectGenerator.new("Section")
     Section.Border.SectionTitle.Text = SafeText(name)
-    Section.Name = RName()
     Section.Parent = sideFolder
 
     return setmetatable({ 
