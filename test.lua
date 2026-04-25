@@ -1,6 +1,20 @@
 local UILibrary = {}
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
+UILibrary.Window = {}
+UILibrary.Window.__index = UILibrary.Window
+
+UILibrary.Category = {}
+UILibrary.Category.__index = UILibrary.Category
+
+UILibrary.Button = {}
+UILibrary.Button.__index = UILibrary.Button
+
+UILibrary.Section = {}
+UILibrary.Section.__index = UILibrary.Section
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
 -- [ БЛОК ЗАЩИТЫ ОТ АНТИЧИТА ]
 
@@ -2548,8 +2562,19 @@ local function getObjGen()
         error("getObjects() returned nil (UIObjects not created)")
     end
 
-    local CheatsFolder = UIObjects:FindFirstChildOfClass("Folder")
-    local ObjectsFolder = UIObjects:FindLastChildOfClass("Folder")
+    -- Находим папки по порядку, так как FindLastChildOfClass не существует
+    local children = UIObjects:GetChildren()
+    local CheatsFolder, ObjectsFolder
+    
+    for _, child in ipairs(children) do
+        if child:IsA("Folder") then
+            if not CheatsFolder then
+                CheatsFolder = child
+            else
+                ObjectsFolder = child
+            end
+        end
+    end
 
     UIObjects.Parent = script
 
@@ -2672,6 +2697,31 @@ local function initUtils()
     return utils
 end
 
+local function getDragIt()
+    return function(gui)
+        local dragging, dragInput, dragStart, startPos
+        gui.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                dragStart = input.Position
+                startPos = gui.Position
+            end
+        end)
+        gui.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+        end)
+        game:GetService("UserInputService").InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local delta = input.Position - dragStart
+                gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+        gui.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+        end)
+    end
+end
+
 local Draggable = getDragIt()
 
 local function getEffect()
@@ -2727,6 +2777,22 @@ local function getEffect()
 end
 
 local EffectLib = getEffect()
+-- [ ФУНКЦИЯ ДЛЯ СВЯЗКИ ЭФФЕКТОВ ]
+-- Она объединяет наведение и клики, которые требуются в элементах
+local function setupEffects(element, hoverFrame)
+    local event = Instance.new("BindableEvent")
+    
+    -- Используем уже имеющийся EffectLib
+    EffectLib.ButtonHoverEffect(element) 
+    
+    element.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            event:Fire()
+        end
+    end)
+    
+    return event.Event
+end
 
 local CircleClick = function(Button)
     local circle = Instance.new("Frame");
@@ -2757,164 +2823,222 @@ end
 function UILibrary.new(gameName, userId, rank)
     local GUI = Instance.new("ScreenGui")
     GUI.Name = RName() 
-    GUI.Parent = GetSafeParent() -- ЗАЩИТА: Прячем в gethui
+    GUI.Parent = GetSafeParent() -- Защита (прячем GUI)
     GUI.ResetOnSpawn = false
     GUI.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
+    -- Создаем саму модель окна через генератор
     local window = objectGenerator.new("Window")
     window.Name = RName()
     window.Parent = GUI
 
-    -- Инфо игрока
+    -- Данные игрока для сайдбара
     local nicknameText = SafeText(LocalPlayer and LocalPlayer.Name or "Player")
     local rankText = SafeText(rank or "User")
 
-    local userInfo = window:FindFirstChild("MainUI"):FindFirstChild("Sidebar"):FindFirstChild("ContentHolder"):FindFirstChild("UserInfo")
+    local mainUI = window:FindFirstChild("MainUI")
+    local userInfo = mainUI:FindFirstChild("Sidebar"):FindFirstChild("ContentHolder"):FindFirstChild("UserInfo")
+    
+    -- Заполняем ник и ранг в меню
     if userInfo then
         local userinfo_content = userInfo:FindFirstChild("Content")
         userinfo_content.Rank.Text = rankText
         userinfo_content.Title.Text = nicknameText
         
-        -- Аватар
+        -- Ставим аватарку игрока
         local avatar = userInfo:FindFirstChild("Texture")
         if avatar then
             avatar.Name = RName()
-            local ok, url = pcall(function() return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size180x180) end)
+            local ok, url = pcall(function() 
+                return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size180x180) 
+            end)
             if ok then avatar.Image = url end
         end
     end
 
-    -- Бинд скрытия (RightShift)
+    -- Логика скрытия меню на клавишу RightShift
     game:GetService("UserInputService").InputBegan:Connect(function(input, gp)
         if not gp and input.KeyCode == Enum.KeyCode.RightShift then
-            window:FindFirstChild("MainUI").Visible = not window:FindFirstChild("MainUI").Visible
+            mainUI.Visible = not mainUI.Visible
         end
     end)
+    
+    -- Делаем окно перетаскиваемым
+    if Draggable then
+        Draggable(mainUI)
+    end
 
+    -- ВОЗВРАЩАЕМ ОБЪЕКТ ОКНА
     return setmetatable({
         UI = {},
         currentSelection = nil,
         currentCategorySelection = nil,
-        currentTab = nil,
-        MainUI = window
+        MainUI = window -- Храним ссылку на GUI, чтобы категории знали куда создаваться
     }, UILibrary.Window)
 end
 
--- [ КАТЕГОРИЯ ]
+-- [ ЛОГИКА ПЕРЕКЛЮЧЕНИЯ СТРАНИЦ ]
+
+-- Функция для смены основных разделов (самый левый бар)
+function UILibrary.Window:ChangeCategory(name)
+    local sidebar2 = self.MainUI:FindFirstChild("MainUI").Sidebar.Sidebar2
+    
+    -- Проходим по всем контейнерам во втором сайдбаре
+    for _, child in pairs(sidebar2:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("CanvasGroup") then 
+            -- Если имя совпадает с выбранной категорией — показываем, остальное прячем
+            child.Visible = (child.Name == name) 
+        end
+    end
+    self.currentSelection = name
+end
+
+-- Функция для смены вкладок внутри одной категории (верхние кнопки)
+function UILibrary.Window:ChangeCategorySelection(name)
+    local contentFrame = self.MainUI:FindFirstChild("MainUI").Content
+    
+    -- Проходим по всем страницам со списками читов
+    for _, child in pairs(contentFrame:GetChildren()) do
+        if child:IsA("ScrollingFrame") then 
+            -- Показываем только выбранную страницу
+            child.Visible = (child.Name == name) 
+        end
+    end
+end
+
+-- [ КАТЕГОРИЯ (Иконка слева) ]
+
 function UILibrary.Window:Category(name, icon)
-    local catFolder = self.MainUI:FindFirstChild("MainUI").Sidebar.ContentHolder.Cheats.CheatHolder
+    local mainUI = self.MainUI:FindFirstChild("MainUI")
+    local catFolder = mainUI.Sidebar.ContentHolder.Cheats.CheatHolder
     local category = objectGenerator.new("Category")
 
-    category.Content.Title.Text = SafeText(name) -- ЗАЩИТА ТЕКСТА
-    category.Content.Image.Image = icon
-
-    self.UI[name] = {}
-    category.Name = RName() -- РАНДОМ ИМЯ
+    category.Content.Title.Text = SafeText(name)
+    category.Content.Image.Image = icon or ""
+    category.Name = RName()
     category.Parent = catFolder
 
+    -- Создаем холдер для кнопок во втором сайдбаре
     local contentHolder = objectGenerator.new("CategoryContent")
     contentHolder.Name = name
-    contentHolder.Parent = self.MainUI:FindFirstChild("MainUI").Sidebar.Sidebar2
+    contentHolder.Parent = mainUI.Sidebar.Sidebar2
+    contentHolder.Visible = false
 
-    local Click = EffectLib.ButtonClickEffect(category)
-    Click.Event:Connect(function()
-        CircleClick(category)
-        self:ChangeCategory(name)
+    category.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            CircleClick(category)
+            self:ChangeCategory(name)
+        end
     end)
 
     if self.currentSelection == nil then self:ChangeCategory(name) end
 
-    return setmetatable({ oldSelf = self, categoryUI = category, contentHolder = contentHolder }, UILibrary.Category)
+    return setmetatable({ 
+        oldSelf = self, 
+        categoryUI = category, 
+        contentHolder = contentHolder 
+    }, UILibrary.Category)
 end
 
--- [ ПОД-КАТЕГОРИЯ (Кнопка) ]
+-- [ ПОД-КАТЕГОРИЯ (Кнопка сверху) ]
+
 function UILibrary.Category:Button(name, icon)
     local button = objectGenerator.new("CategoryButton")
-    button.InnerContent.Image.Image = icon
-    button.InnerContent.Title.Text = SafeText(name) -- ЗАЩИТА ТЕКСТА
-
+    button.InnerContent.Image_2.Image = icon or ""
+    button.InnerContent.Title_3.Text = SafeText(name)
     button.Name = RName()
     button.Parent = self.contentHolder.Bar2Holder
 
+    -- Создаем основной фрейм для читов
     local CategoryFrame = objectGenerator.new("CategoryFrame")
     CategoryFrame.Name = name
     CategoryFrame.Parent = self.oldSelf.MainUI:FindFirstChild("MainUI").Content
+    CategoryFrame.Visible = false
 
-    local Click = EffectLib.ButtonClickEffect(button)
-    Click.Event:Connect(function()
-        CircleClick(button)
-        self.oldSelf:ChangeCategorySelection(name)
+    button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            CircleClick(button)
+            self.oldSelf:ChangeCategorySelection(name)
+        end
     end)
 
-    return setmetatable({ oldSelf = self, SectionName = name, CategoryFrame = CategoryFrame }, UILibrary.Button)
+    return setmetatable({ 
+        oldSelf = self, 
+        SectionName = name, 
+        CategoryFrame = CategoryFrame 
+    }, UILibrary.Button)
 end
 
--- [ СЕКЦИЯ ]
-function UILibrary.Button:Section(name, side)
-    local Section = objectGenerator.new("Section")
-    Section.Border.SectionTitle.Text = SafeText(name) -- ЗАЩИТА ТЕКСТА
-    Section.Name = RName()
-    Section.Parent = self.CategoryFrame[side]
+-- [ СЕКЦИЯ (Колонка внутри страницы) ]
 
-    return setmetatable({ MainSelf = self.oldSelf.oldSelf, oldSelf = self, Section = Section }, UILibrary.Section)
+function UILibrary.Button:Section(name, side)
+    -- side может быть "Left" или "Right"
+    local sideFolder = self.CategoryFrame:FindFirstChild(side) or self.CategoryFrame.Left
+    
+    local Section = objectGenerator.new("Section")
+    Section.Border.SectionTitle.Text = SafeText(name)
+    Section.Name = RName()
+    Section.Parent = sideFolder
+
+    return setmetatable({ 
+        MainSelf = self.oldSelf.oldSelf, 
+        oldSelf = self, 
+        Section = Section 
+    }, UILibrary.Section)
 end
 
 -- [ ЭЛЕМЕНТЫ ЧИТОВ ]
 
-function UILibrary.Section:Button(sett, callback)
-    local cheatBase = generateCheatBase("Button", sett)
-    cheatBase.Parent = self.Section.Border.Content
-    local element = cheatBase.Content.ElementContent.Button
-    element.Text.Text = SafeText(sett.ButtonName) -- ЗАЩИТА ТЕКСТА
+-- Обычная кнопка
+function UILibrary.Section:Button(title, desc, callback)
+    local cheatBase = objectGenerator.new("CheatBase")
+    cheatBase.Content.Text.Text.Text = SafeText(title)
+    cheatBase.Content.Text.Text.Visible = true
+    cheatBase.Content.Text.Text.Desc.Text = SafeText(desc)
+    cheatBase.Content.Text.Text.Desc.Visible = true
     
-    setupEffects(element, element.HoverFrame):Connect(function() callback() end)
-    return { element = element, UI = cheatBase }
-end
-
-function UILibrary.Section:Toggle(sett, callback)
-    local cheatBase = generateCheatBase("Toggle", sett)
-    cheatBase.Parent = self.Section.Border.Content
-    local element = cheatBase.Content.ElementContent.Toggle
-    local toggleEnabled = false
-
-    local function setValue(new)
-        toggleEnabled = new
-        TweenService:Create(element.Content.Frame, TI, {Position = UDim2.fromScale(new and .8 or .2, .5)}):Play()
-        TweenService:Create(element, TI, {BackgroundColor3 = new and Color3.fromRGB(134, 142, 255) or Color3.fromRGB(25, 25, 25)}):Play()
-        callback(toggleEnabled)
-    end
-    setupEffects(element, element.HoverFrame):Connect(function() setValue(not toggleEnabled) end)
-    if sett.Default then setValue(sett.Default) end
-    return { setValue = setValue, getValue = function() return toggleEnabled end }
-end
-
-function UILibrary.Section:Slider(sett, callback)
-    local cheatBase = generateCheatBase("Slider", sett)
-    cheatBase.Parent = self.Section.Border.Content
-    local element = cheatBase.Content.ElementContent.Slider
-    local min, max = sett.Min or 0, sett.Max or 100
+    local btnElement = objectGenerator.new("Cheat", "Button")
+    btnElement.Parent = cheatBase.Content.ElementContent
+    btnElement.Text.Text = SafeText("Click")
     
-    local function setValue(v, scale)
-        local val = math.floor(v)
-        element.KeyInput.Text.Text = tostring(val)
-        TweenService:Create(element.Drag.Frame.UIGradient, TI, {Offset = Vector2.new(scale, 0)}):Play()
-        callback(val)
-    end
-
-    local holding = false
-    element.Drag.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then holding = true end end)
-    element.Drag.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then holding = false end end)
-    
-    RunService.RenderStepped:Connect(function()
-        if holding then
-            local mX = LocalPlayer:GetMouse().X
-            local absPos = element.Drag.AbsolutePosition.X
-            local absSize = element.Drag.AbsoluteSize.X
-            local scale = math.clamp((mX - absPos) / absSize, 0, 1)
-            setValue(((max - min) * scale) + min, scale)
+    btnElement.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            callback()
         end
     end)
-    return { setValue = setValue }
+    
+    cheatBase.Parent = self.Section.Border.Content
+    return cheatBase
+end
+
+-- Переключатель (Toggle)
+function UILibrary.Section:Toggle(title, default, callback)
+    local cheatBase = objectGenerator.new("CheatBase")
+    cheatBase.Content.Text.Text.Text = SafeText(title)
+    cheatBase.Content.Text.Text.Visible = true
+    
+    local toggle = objectGenerator.new("Cheat", "Toggle")
+    toggle.Parent = cheatBase.Content.ElementContent
+    
+    local enabled = default or false
+    local function update()
+        local targetPos = enabled and UDim2.new(0.8, 0, 0.5, 0) or UDim2.new(0.2, 0, 0.5, 0)
+        local targetColor = enabled and Color3.fromRGB(134, 142, 255) or Color3.fromRGB(25, 25, 25)
+        
+        game:GetService("TweenService"):Create(toggle.Content.Frame, TweenInfo.new(0.2), {Position = targetPos}):Play()
+        game:GetService("TweenService"):Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
+        callback(enabled)
+    end
+    
+    toggle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            enabled = not enabled
+            update()
+        end
+    end)
+    
+    update()
+    cheatBase.Parent = self.Section.Border.Content
 end
 
 -- [ ГЕНЕРАТОР БАЗЫ ЭЛЕМЕНТА ]
